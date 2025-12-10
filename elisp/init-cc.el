@@ -45,18 +45,18 @@
 ;; -CPPFontLockPac
 
 ;; GoPac
-(use-package go-mode
-  :mode "\\.go\\'"
-  :hook (before-save . gofmt-before-save)
-  :custom (gofmt-command "goimports"))
+;(use-package go-mode
+;  :mode "\\.go\\'"
+;  :hook (before-save . gofmt-before-save)
+;  :custom (gofmt-command "goimports"))
 ;; -GoPac
 
 ;; RustPac
-(use-package rust-mode
-  :mode "\\.rs\\'"
-  :custom
-  (rust-format-on-save t)
-  :bind (:map rust-mode-map ("C-c C-c" . rust-run)))
+;(use-package rust-mode
+;  :mode "\\.rs\\'"
+;  :custom
+;  (rust-format-on-save t)
+;  :bind (:map rust-mode-map ("C-c C-c" . rust-run)))
 ;; -RustPac
 
 (provide 'init-cc)

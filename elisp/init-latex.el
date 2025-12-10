@@ -40,6 +40,20 @@
   (require 'init-global-config)
   (require 'init-func))
 
+;; CDLaTeX
+(use-package cdlatex
+  :ensure t
+  :defer t
+  :hook ((LaTeX-mode . turn-on-cdlatex)
+         (org-mode . turn-on-org-cdlatex))
+  :config
+  ;; 可选：自定义符号或行为
+  ;; (setq cdlatex-autospace t)
+  ;; (setq cdlatex-math-symbol-alist
+  ;;       (append cdlatex-math-symbol-alist
+  ;;               '(("RR" "\\mathbb{R}"))))
+  )
+
 ;; AUCTeXPac
 (use-package auctex
   :defer t
