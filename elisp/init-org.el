@@ -71,7 +71,7 @@
 
 (setq org-todo-keywords
     (quote ((sequence "TODO(t)" "NEXT(n)" "|" "DONE(d)")
-            (sequence "WAITING(w@/!)" "HOLD(h@/!)" "MEETING" "|" "CANCELLED(c@/!)" "PHONE"))))
+            (sequence "WAITING(w@/!)" "HOLD(h@/!)" "|" "MEETING" "CANCELLED(c@/!)" "PHONE"))))
 
 
 (setq org-refile-targets
@@ -106,7 +106,7 @@
     (or (outline-next-heading) (point-max))))
 
 (setq org-agenda-custom-commands
-      '(("x" "My Daily Agenda with Unscheduled Todos"
+      '((" " "Daily Agenda with GTD Tracking"
          ((agenda ""
                   ((org-agenda-span 'day)))
 
@@ -120,16 +120,135 @@
             (org-tags-match-list-sublevels nil)))
 
           (tags-todo "PROJ/NEXT"
-           ((org-agenda-overriding-header "Project’s Next Move")
+           ((org-agenda-overriding-header "Project's Next Move")
             (org-tags-match-list-sublevels nil)))
 
-          (tags "PROJ-HOLD-CANCELLED "
+          (tags "PROJ/TODO"
             ((org-agenda-overriding-header "On-Going Projects")
-            (org-agenda-skip-function 'my/skip-non-toplevel-headlines)  ;
+            (org-agenda-skip-function 'my/skip-non-toplevel-headlines)
             (org-tags-match-list-sublevels nil)))
+
+          (tags "PROJ/HOLD"
+            ((org-agenda-overriding-header "Stucked Proj.")
+            (org-agenda-skip-function 'my/skip-non-toplevel-headlines)
+            (org-tags-match-list-sublevels nil)))
+))))
+
+
+
+
+(defun my/org-archive-by-tag ()
+  "根据标签归档当前子树到同一个文件的不同标题下。
+    - Project 标签 -> * Archived Projects
+    - Meeting 标签 -> * Archived Meetings  
+    - Phone 标签 -> * Archived Phone
+    - 其他 -> * Archived Tasks"
+  (interactive)
+  (let* ((tags (org-get-tags))
+         (archive-file "d:/org/gtd/archive.org")  ; 你的归档文件路径
+         (heading
+          (cond
+           ((member "PROJ" tags) "* Archived Projects")
+           ((member "MEETING" tags) "* Archived Meetings")
+           ((member "PHONE" tags) "* Archived Phone")
+           (t "* Archived Tasks"))))
+    ;; 设置归档位置：文件路径::标题
+    (setq org-archive-location (concat archive-file "::" heading))
+    (org-archive-subtree)))
+
+(with-eval-after-load 'org
+  (define-key org-mode-map (kbd "C-c $") #'my/org-archive-by-tag))
+
+; ===========================================================
+; 自动将下一个 Project 任务变为 NEXT
+; ===========================================================
+
+(defun my/org-auto-mark-next-on-done ()
+  "智能自动标记下一个任务为 NEXT，支持 Agenda 和普通缓冲区"
+  (interactive)
+  
+  (let ((in-agenda (eq major-mode 'org-agenda-mode))
+        marker buffer point)
+    
+    ;; 1. 确定当前上下文
+    (cond
+     ;; 在 Agenda 视图中
+     (in-agenda
+      (setq marker (or (org-get-at-bol 'org-marker)
+                       (org-agenda-error)))
+      (setq buffer (marker-buffer marker))
+      (setq point (marker-position marker)))
+     
+     ;; 在普通 Org 缓冲区中
+     ((derived-mode-p 'org-mode)
+      (setq buffer (current-buffer))
+      (setq point (point)))
+     
+     ;; 其他情况
+     (t
+      (error "不在 Org-mode 或 Agenda 视图中")))
+    
+    ;; 2. 获取当前任务状态
+    (with-current-buffer buffer
+      (save-excursion
+        (save-restriction
+          (widen)
+          (goto-char point)
           
+          (let ((current-state (org-get-todo-state))
+                (current-heading (org-get-heading t t t t))
+                (current-level (org-current-level))
+                found-next)
             
-          ))))
+            ;; 3. 只有在标记为 DONE 和 CANCELLED 时才执行
+            (when (member current-state '("DONE" "CANCELLED" "DONE(d)"))
+              
+              ;; 4. 移动到当前标题末尾
+              (org-end-of-subtree)
+              
+              ;; 5. 查找下一个同级 TODO 任务
+              (while (and (not found-next)
+                          (outline-next-heading))
+                (let ((level (org-current-level))
+                      (todo-state (org-entry-get (point) "TODO")))
+                  
+                  (cond
+                   ;; 找到同级 TODO 任务
+                   ((and (<= level current-level)
+                         (equal todo-state "TODO"))
+                    (setq found-next t)
+                    (org-todo "NEXT")
+                    
+                    ;; 显示消息
+                    (if in-agenda
+                        (message "✓ Agenda: '%s' 已完成，下一个任务 '%s' 已标记为 NEXT"
+                                 current-heading
+                                 (org-get-heading t t t t))
+                      (message "✓ '%s' 已完成，下一个任务 '%s' 已标记为 NEXT"
+                               current-heading
+                               (org-get-heading t t t t))))
+                   
+                   ;; 遇到更高级别的标题，停止搜索
+                   ((< level current-level)
+                    (setq found-next t))
+                   
+                   ;; 其他情况继续搜索
+                   (t nil))))
+              
+              ;; 6. 如果没有找到下一个 TODO 任务
+              (unless found-next
+                (if in-agenda
+                    (message "✓ Agenda: '%s' 已完成，没有找到下一个 TODO 任务" 
+                             current-heading)
+                  (message "✓ '%s' 已完成，没有找到下一个 TODO 任务" 
+                           current-heading))))))))))
+
+
+;; 4. 添加到两个钩子
+(add-hook 'org-after-todo-state-change-hook 'my/org-auto-mark-next-on-done)
+(add-hook 'org-agenda-after-todo-state-change-hook 'my/org-auto-mark-next-on-done)
+
+
 
 (if *sys/win32*
     (setq temporary-file-directory "C:/Users/ChangHao/AppData/Local/Temp"))
@@ -304,10 +423,10 @@
    (setq org-modern-table-horizontal 0)
 
   ;; 复选框美化
-;  (setq org-modern-checkbox
-;	'((?X . #("▢✓" 0 2 (composition ((2)))))
-;	  (?- . #("▢–" 0 2 (composition ((2)))))
-;	  (?\s . #("▢" 0 1 (composition ((1)))))))
+  (setq org-modern-checkbox
+	'((?X . #("▢✓" 0 2 (composition ((2)))))
+	  (?- . #("▢–" 0 2 (composition ((2)))))
+	  (?\s . #("▢" 0 1 (composition ((1)))))))
   ;; 列表符号美化
   (setq org-modern-list
 	'((?- . "•")
