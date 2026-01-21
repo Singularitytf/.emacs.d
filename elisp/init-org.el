@@ -105,6 +105,15 @@
   (unless (= (org-current-level) 2)
     (or (outline-next-heading) (point-max))))
 
+(defun my/moves-skipper ()
+  "Skip headlines that are either:
+  - Not level 2, OR
+  - Have a SCHEDULED timestamp."
+  (or (my/skip-non-toplevel-headlines)
+      (when (org-entry-get nil "SCHEDULED")
+        (outline-next-heading)
+        (point))))
+
 (setq org-agenda-custom-commands
       '((" " "Daily Agenda with GTD Tracking"
          ((agenda ""
@@ -116,7 +125,7 @@
           
           (tags-todo "MOVS"
            ((org-agenda-overriding-header "Single-step Tasks")
-           (org-agenda-skip-function 'my/skip-non-toplevel-headlines)
+           (org-agenda-skip-function 'my/moves-skipper)  ; 跳过排期的日程
             (org-tags-match-list-sublevels nil)))
 
           (tags-todo "PROJ/NEXT"
@@ -145,7 +154,7 @@
     - 其他 -> * Archived Tasks"
   (interactive)
   (let* ((tags (org-get-tags))
-         (archive-file "d:/org/gtd/archive.org")  ; 你的归档文件路径
+         (archive-file (concat my-gtd-dir "/archive.org"))  ; 你的归档文件路径
          (heading
           (cond
            ((member "PROJ" tags) "* Archived Projects")
@@ -164,7 +173,7 @@
 ; ===========================================================
 
 (defun my/org-auto-mark-next-on-done ()
-  "智能自动标记下一个任务为 NEXT，支持 Agenda 和普通缓冲区"
+  "智能自动标记下一个任务为 NEXT，仅当当前任务带有 PROJ 标签时生效"
   (interactive)
   
   (let ((in-agenda (eq major-mode 'org-agenda-mode))
@@ -177,7 +186,7 @@
       (setq marker (or (org-get-at-bol 'org-marker)
                        (org-agenda-error)))
       (setq buffer (marker-buffer marker))
-      (setq point (marker-position marker)))
+      (setq point (marker-position)))
      
      ;; 在普通 Org 缓冲区中
      ((derived-mode-p 'org-mode)
@@ -188,7 +197,7 @@
      (t
       (error "不在 Org-mode 或 Agenda 视图中")))
     
-    ;; 2. 获取当前任务状态
+    ;; 2. 获取当前任务状态，并检查是否含 PROJ 标签
     (with-current-buffer buffer
       (save-excursion
         (save-restriction
@@ -200,8 +209,9 @@
                 (current-level (org-current-level))
                 found-next)
             
-            ;; 3. 只有在标记为 DONE 和 CANCELLED 时才执行
-            (when (member current-state '("DONE" "CANCELLED" "DONE(d)"))
+            ;; 3. 只有在标记为 DONE / CANCELLED 且带有 PROJ 标签时才执行
+            (when (and (member current-state '("DONE" "CANCELLED" "DONE(d)"))
+                       (member "PROJ" (org-get-tags)))
               
               ;; 4. 移动到当前标题末尾
               (org-end-of-subtree)
@@ -221,10 +231,10 @@
                     
                     ;; 显示消息
                     (if in-agenda
-                        (message "✓ Agenda: '%s' 已完成，下一个任务 '%s' 已标记为 NEXT"
+                        (message "✓ Agenda: '%s' [PROJ] 已完成，下一个任务 '%s' 已标记为 NEXT"
                                  current-heading
                                  (org-get-heading t t t t))
-                      (message "✓ '%s' 已完成，下一个任务 '%s' 已标记为 NEXT"
+                      (message "✓ '%s' [PROJ] 已完成，下一个任务 '%s' 已标记为 NEXT"
                                current-heading
                                (org-get-heading t t t t))))
                    
@@ -238,17 +248,16 @@
               ;; 6. 如果没有找到下一个 TODO 任务
               (unless found-next
                 (if in-agenda
-                    (message "✓ Agenda: '%s' 已完成，没有找到下一个 TODO 任务" 
+                    (message "✓ Agenda: '%s' [PROJ] 已完成，没有找到下一个 TODO 任务" 
                              current-heading)
-                  (message "✓ '%s' 已完成，没有找到下一个 TODO 任务" 
+                  (message "✓ '%s' [PROJ] 已完成，没有找到下一个 TODO 任务" 
                            current-heading))))))))))
-
-
 ;; 4. 添加到两个钩子
 (add-hook 'org-after-todo-state-change-hook 'my/org-auto-mark-next-on-done)
 (add-hook 'org-agenda-after-todo-state-change-hook 'my/org-auto-mark-next-on-done)
 
-
+; org 打开文件默认折叠
+(setq org-startup-folded 'overview)
 
 (if *sys/win32*
     (setq temporary-file-directory "C:/Users/ChangHao/AppData/Local/Temp"))
@@ -288,6 +297,8 @@
                 ("C-c i d" . org-download-delete)
                 ("C-c i e" . org-download-edit)
                 ("C-M-y" . my/org-download-clipboard)))
+
+(setq org-log-done 'time)
 
 (use-package org
   :after tex  ; 在 tex 包加载之后再加载 org（确保 LaTeX 相关功能可用）

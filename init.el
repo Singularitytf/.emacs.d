@@ -212,6 +212,7 @@ If you experience freezing, decrease this.  If you experience stuttering, increa
 
 ;; Miscellaneous
 ;(require 'init-chinese)
+(require 'init-chinese-font)
 
 ;; WSL2 下与 Windows 剪贴板互通
 (when (and (eq system-type 'gnu/linux)
