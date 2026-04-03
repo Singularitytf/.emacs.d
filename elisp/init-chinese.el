@@ -56,16 +56,17 @@
   (setq-default pyim-punctuation-half-width-functions
                 '(pyim-probe-punctuation-line-beginning
                   pyim-probe-punctuation-after-punctuation))
+  (setq-default pyim-punctuation-translate-p '(no yes auto))
   :bind
   ("M-j" . pyim-convert-string-at-point)) ; M-j 强制将光标前的拼音字符串转换为中文。
 ;; -PyimPac
 
 ;; YoudaoPac
-(use-package youdao-dictionary
-  :commands (youdao-dictionary-search
-             youdao-dictionary-search-at-point
-             youdao-dictionary-search-at-point-posframe)
-  :bind ("C-M-y" . youdao-dictionary-search-at-point-posframe))
+;(use-package youdao-dictionary
+;  :commands (youdao-dictionary-search
+;             youdao-dictionary-search-at-point
+;             youdao-dictionary-search-at-point-posframe)
+;  :bind ("C-M-y" . youdao-dictionary-search-at-point-posframe))
 ;; -YoudaoPac
 
 (provide 'init-chinese)
