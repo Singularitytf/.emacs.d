@@ -256,6 +256,17 @@
 (add-hook 'org-after-todo-state-change-hook 'my/org-auto-mark-next-on-done)
 (add-hook 'org-agenda-after-todo-state-change-hook 'my/org-auto-mark-next-on-done)
 
+(use-package org-download
+    :custom
+    (org-download-heading-lvl 1) ; 以一级标题作为图片文件夹
+    (org-download-method #'my/org-download-method)
+    :after org
+    :bind (:map org-mode-map
+                ("C-c i y" . org-download-yank)
+                ("C-c i d" . org-download-delete)
+                ("C-c i e" . org-download-edit)
+                ("C-M-y" . my/org-download-clipboard)))
+
 ; org 打开文件默认折叠
 (setq org-startup-folded 'overview)
 
@@ -281,22 +292,35 @@
       (org-download-image filename)
       (delete-file filename))))
 
+(defun my/org-download-clipboard-WSL ()
+  (interactive)
+  ;; 1. 确认函数是否被调用
+  (message "👉 [DEBUG] 进入 WSL 截图函数...")
+  
+  (let ((filename (expand-file-name "screenshot.png" "/tmp/")))
+    ;; 2. 打印完整的命令，方便检查路径和格式
+    (let ((cmd (format "magick.exe clipboard: %s" filename)))
+      (message "👉 [DEBUG] 准备执行命令: %s" cmd)
+      
+      ;; 3. 执行命令并捕获输出（防止命令报错导致 Emacs 卡住）
+      (let ((result (shell-command-to-string cmd)))
+        (message "👉 [DEBUG] 命令执行完毕，返回结果: %s" (or result "nil"))
+        
+        ;; 4. 检查文件是否真的生成了
+        (if (file-exists-p filename)
+            (progn
+              (message "👉 [DEBUG] 文件存在，准备插入图片: %s" filename)
+              (org-download-image filename)
+              (delete-file filename)
+              (message "👉 [DEBUG] 图片插入成功，临时文件已删除。"))
+          (message "❌ [DEBUG] 错误：文件未生成 (%s)，请检查 magick 是否在 PATH 中。" filename))))))
+
 (defun my/org-download-clipboard ()
   (interactive)
   (cond (*sys/win32* (my/org-download-clipboard-windows))
-        ;(my/is-WSL (my/org-download-clipboard-WSL))
+        (*sys/wsl* (my/org-download-clipboard-WSL))
         (t (org-download-clipboard)))) ; for Linux system
 
-(use-package org-download
-    :custom
-    (org-download-heading-lvl 1) ; 以一级标题作为图片文件夹
-    (org-download-method #'my/org-download-method)
-    :after org
-    :bind (:map org-mode-map
-                ("C-c i y" . org-download-yank)
-                ("C-c i d" . org-download-delete)
-                ("C-c i e" . org-download-edit)
-                ("C-M-y" . my/org-download-clipboard)))
 
 (setq org-log-done 'time)
 
@@ -546,23 +570,23 @@
 ;; -OrgPac
 
 (use-package org-roam
-            :ensure t ;; 自动安装
-            :custom
-            (org-roam-directory my-roam-dir) ;; 默认笔记目录, 提前手动创建好
-            (org-roam-dailies-directory "daily/") ;; 默认日记目录, 上一目录的相对路径
-            (org-roam-db-gc-threshold most-positive-fixnum) ;; 提高性能
-            :bind (("C-c n f" . org-roam-node-find)
-                   ;; 如果你的中文输入法会拦截非 ctrl 开头的快捷键, 也可考虑类似如下的设置
-                   ;; ("C-c C-n C-f" . org-roam-node-find)
-                   ("C-c n i" . org-roam-node-insert)
-                   ("C-c n c" . org-roam-capture)
-                   ("C-c n l" . org-roam-buffer-toggle) ;; 显示后链窗口
-                   ("C-c n u" . org-roam-ui-mode)) ;; 浏览器中可视化
-            :bind-keymap
-            ("C-c n d" . org-roam-dailies-map) ;; 日记菜单
-            :config
-            (require 'org-roam-dailies)  ;; 启用日记功能
-            (org-roam-db-autosync-mode)) ;; 启动时自动同步数据库
+  :ensure t ;; 自动安装
+  :custom
+  (org-roam-directory my-roam-dir) ;; 默认笔记目录, 提前手动创建好
+  (org-roam-dailies-directory "daily/") ;; 默认日记目录, 上一目录的相对路径
+  (org-roam-db-gc-threshold most-positive-fixnum) ;; 提高性能
+  :bind (("C-c n f" . org-roam-node-find)
+          ;; 如果你的中文输入法会拦截非 ctrl 开头的快捷键, 也可考虑类似如下的设置
+          ;; ("C-c C-n C-f" . org-roam-node-find)
+          ("C-c n i" . org-roam-node-insert)
+          ("C-c n c" . org-roam-capture)
+          ("C-c n l" . org-roam-buffer-toggle) ;; 显示后链窗口
+          ("C-c n u" . org-roam-ui-mode)) ;; 浏览器中可视化
+  :bind-keymap
+  ("C-c n d" . org-roam-dailies-map) ;; 日记菜单
+  :config
+  (require 'org-roam-dailies)  ;; 启用日记功能
+  (org-roam-db-autosync-mode)) ;; 启动时自动同步数据库
 
 (use-package org-roam-ui
   :ensure t ;; 自动安装

@@ -39,20 +39,22 @@
   (setq fonts '("SF Mono" "冬青黑体简体中文"))
   (set-fontset-font t 'unicode "Apple Color Emoji" nil 'prepend)
   (set-face-attribute 'default nil :font
-                      (format "%s:pixelsize=%d" (car fonts) 14)))
+                      (format "%s:pixelsize=%d" (car fonts) 16)))
 
 (when *sys/win32*
   (setq fonts '("Consolas" "微软雅黑"))
   (set-fontset-font t 'unicode "Segoe UI Emoji" nil 'prepend)
   (set-face-attribute 'default nil :font
-                      (format "%s:pixelsize=%d" (car fonts) 14)))
+                      (format "%s:pixelsize=%d" (car fonts) 16)))
 
 (when (or *sys/wsl* *sys/linux*)
-  (setq fonts '("Ubuntu Mono" "Monospace"))
-  (set-fontset-font t 'unicode "Noto Color Emoji" nil 'prepend)
-  (set-fontset-font t 'han "Noto Sans CJK SC" nil 'prepend)
-  (set-face-attribute 'default nil :font
-                      (format "%s:pixelsize=%d" (car fonts) 14)))
+  (setq fonts '("Ubuntu Sans Mono" "Noto Serif CJK SC"))
+  (set-fontset-font t 'unicode "Ubuntu Sans Mono" nil 'prepend)
+  (set-fontset-font t 'han "Noto Serif CJK SC" nil 'prepend)
+  (set-face-attribute 'default nil 
+                      :family (car fonts) 
+                      :weight 'bold
+                      :height 130)) ;; 注意：:height 单位是 1/10 pt，160 约等于 16px
 
 (if (display-graphic-p)
     (dolist (charset '(kana han symbol cjk-misc bopomofo))

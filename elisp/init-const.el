@@ -53,6 +53,12 @@
   (eq system-type 'darwin)
   "Are we running on a Mac system?")
 
+(defconst *sys/wsl*
+  (and (eq system-type 'gnu/linux)
+       (string-match "Microsoft" operating-system-release)
+       t) ; 
+  "Are we running on WSL?")
+  
 (defconst python-p
   (or (executable-find "python3")
       (and (executable-find "python")
