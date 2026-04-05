@@ -257,6 +257,7 @@
 (add-hook 'org-agenda-after-todo-state-change-hook 'my/org-auto-mark-next-on-done)
 
 (use-package org-download
+    :hook (org-mode . (lambda () (require 'org-download)))  ; 进入 org-mode 时加载 org-download
     :custom
     (org-download-heading-lvl 1) ; 以一级标题作为图片文件夹
     (org-download-method #'my/org-download-method)
@@ -293,27 +294,28 @@
       (delete-file filename))))
 
 (defun my/org-download-clipboard-WSL ()
+  "将截图从 Windows 剪贴板保存并插入到 Org 文件中。"
   (interactive)
-  ;; 1. 确认函数是否被调用
-  (message "👉 [DEBUG] 进入 WSL 截图函数...")
+  ;(message "👉 [DEBUG] 进入 WSL 截图函数...")
   
-  (let ((filename (expand-file-name "screenshot.png" "/tmp/")))
-    ;; 2. 打印完整的命令，方便检查路径和格式
-    (let ((cmd (format "magick.exe clipboard: %s" filename)))
-      (message "👉 [DEBUG] 准备执行命令: %s" cmd)
+  (let* ((linux-filename (expand-file-name (format "screenshot-%s.png" (format-time-string "%Y%m%d-%H%M%S")) "/tmp/"))
+         ;; 转换为 Windows 路径
+         (windows-filename (string-trim (shell-command-to-string (format "wslpath -w '%s'" linux-filename)))))
+    
+    ;(message "👉 [DEBUG] Linux 路径: %s" linux-filename)
+    ;(message "👉 [DEBUG] Windows 路径: %s" windows-filename)
+    
+    ;; 使用 call-process 代替 shell-command-to-string，更可靠
+    (let ((exit-code (call-process "magick.exe" nil nil nil "clipboard:" windows-filename)))
+      ;(message "👉 [DEBUG] magick.exe 退出码: %s" exit-code)
       
-      ;; 3. 执行命令并捕获输出（防止命令报错导致 Emacs 卡住）
-      (let ((result (shell-command-to-string cmd)))
-        (message "👉 [DEBUG] 命令执行完毕，返回结果: %s" (or result "nil"))
-        
-        ;; 4. 检查文件是否真的生成了
-        (if (file-exists-p filename)
-            (progn
-              (message "👉 [DEBUG] 文件存在，准备插入图片: %s" filename)
-              (org-download-image filename)
-              (delete-file filename)
-              (message "👉 [DEBUG] 图片插入成功，临时文件已删除。"))
-          (message "❌ [DEBUG] 错误：文件未生成 (%s)，请检查 magick 是否在 PATH 中。" filename))))))
+      (if (and (= exit-code 0) (file-exists-p linux-filename))
+        (progn
+          (message "✅ 截图成功，正在插入...")
+          (org-download-image linux-filename)
+          (delete-file linux-filename)
+          (message "✅ 图片插入完成"))
+        (message "❌ 截图失败。请确保: 1. ImageMagick 已安装 2. 剪贴板中有图片数据")))))
 
 (defun my/org-download-clipboard ()
   (interactive)
