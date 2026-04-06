@@ -63,7 +63,7 @@
       `(("t" "Todo" entry (file+headline ,(concat my-gtd-dir "/inbox.org") "TODOs")
          "* TODO %?\n%U\n" :prepend t)
         ("m" "Meeting" entry (file+headline ,(concat my-gtd-dir "/inbox.org") "Meetings")
-              "* MEETING with %? :MEETING:\n%U")  
+              "* MEETING with %? :MEETING:\n%U" :clock-in t :clock-resume t)  
         ("r" "respond" entry (file+headline ,(concat my-gtd-dir "/inbox.org") "Respond")
                "* NEXT Respond to %:from on %:subject\nSCHEDULED: %t\n%U\n%a\n" :clock-in t :clock-resume t :immediate-finish t)
         ("p" "Phone call" entry (file+headline ,(concat my-gtd-dir "/inbox.org") "Calling")
@@ -114,38 +114,6 @@
         (outline-next-heading)
         (point))))
 
-(setq org-agenda-custom-commands
-      '((" " "Daily Agenda with GTD Tracking"
-         ((agenda ""
-                  ((org-agenda-span 'day)))
-
-          (tags-todo "IBX"
-                      ((org-agenda-overriding-header "Tasks to Refile")
-                       (org-tags-match-list-sublevels nil)))
-          
-          (tags-todo "MOVS"
-           ((org-agenda-overriding-header "Single-step Tasks")
-           (org-agenda-skip-function 'my/moves-skipper)  ; 跳过排期的日程
-            (org-tags-match-list-sublevels nil)))
-
-          (tags-todo "PROJ/NEXT"
-           ((org-agenda-overriding-header "Project's Next Move")
-            (org-tags-match-list-sublevels nil)))
-
-          (tags "PROJ/TODO"
-            ((org-agenda-overriding-header "On-Going Projects")
-            (org-agenda-skip-function 'my/skip-non-toplevel-headlines)
-            (org-tags-match-list-sublevels nil)))
-
-          (tags "PROJ/HOLD"
-            ((org-agenda-overriding-header "Stucked Proj.")
-            (org-agenda-skip-function 'my/skip-non-toplevel-headlines)
-            (org-tags-match-list-sublevels nil)))
-))))
-
-
-
-
 (defun my/org-archive-by-tag ()
   "根据标签归档当前子树到同一个文件的不同标题下。
     - Project 标签 -> * Archived Projects
@@ -168,94 +136,166 @@
 (with-eval-after-load 'org
   (define-key org-mode-map (kbd "C-c $") #'my/org-archive-by-tag))
 
-; ===========================================================
-; 自动将下一个 Project 任务变为 NEXT
-; ===========================================================
 
-(defun my/org-auto-mark-next-on-done ()
-  "智能自动标记下一个任务为 NEXT，仅当当前任务带有 PROJ 标签时生效"
-  (interactive)
-  
-  (let ((in-agenda (eq major-mode 'org-agenda-mode))
-        marker buffer point)
-    
-    ;; 1. 确定当前上下文
-    (cond
-     ;; 在 Agenda 视图中
-     (in-agenda
-      (setq marker (or (org-get-at-bol 'org-marker)
-                       (org-agenda-error)))
-      (setq buffer (marker-buffer marker))
-      (setq point (marker-position)))
-     
-     ;; 在普通 Org 缓冲区中
-     ((derived-mode-p 'org-mode)
-      (setq buffer (current-buffer))
-      (setq point (point)))
-     
-     ;; 其他情况
-     (t
-      (error "不在 Org-mode 或 Agenda 视图中")))
-    
-    ;; 2. 获取当前任务状态，并检查是否含 PROJ 标签
-    (with-current-buffer buffer
-      (save-excursion
-        (save-restriction
-          (widen)
-          (goto-char point)
+(setq org-agenda-custom-commands
+      '((" " "Daily Agenda with GTD Tracking"
+         ((agenda "" ((org-agenda-span 'day)))
           
-          (let ((current-state (org-get-todo-state))
-                (current-heading (org-get-heading t t t t))
-                (current-level (org-current-level))
-                found-next)
-            
-            ;; 3. 只有在标记为 DONE / CANCELLED 且带有 PROJ 标签时才执行
-            (when (and (member current-state '("DONE" "CANCELLED" "DONE(d)"))
-                       (member "PROJ" (org-get-tags)))
-              
-              ;; 4. 移动到当前标题末尾
-              (org-end-of-subtree)
-              
-              ;; 5. 查找下一个同级 TODO 任务
-              (while (and (not found-next)
-                          (outline-next-heading))
-                (let ((level (org-current-level))
-                      (todo-state (org-entry-get (point) "TODO")))
-                  
-                  (cond
-                   ;; 找到同级 TODO 任务
-                   ((and (<= level current-level)
-                         (equal todo-state "TODO"))
-                    (setq found-next t)
-                    (org-todo "NEXT")
-                    
-                    ;; 显示消息
-                    (if in-agenda
-                        (message "✓ Agenda: '%s' [PROJ] 已完成，下一个任务 '%s' 已标记为 NEXT"
-                                 current-heading
-                                 (org-get-heading t t t t))
-                      (message "✓ '%s' [PROJ] 已完成，下一个任务 '%s' 已标记为 NEXT"
-                               current-heading
-                               (org-get-heading t t t t))))
-                   
-                   ;; 遇到更高级别的标题，停止搜索
-                   ((< level current-level)
-                    (setq found-next t))
-                   
-                   ;; 其他情况继续搜索
-                   (t nil))))
-              
-              ;; 6. 如果没有找到下一个 TODO 任务
-              (unless found-next
-                (if in-agenda
-                    (message "✓ Agenda: '%s' [PROJ] 已完成，没有找到下一个 TODO 任务" 
-                             current-heading)
-                  (message "✓ '%s' [PROJ] 已完成，没有找到下一个 TODO 任务" 
-                           current-heading))))))))))
-;; 4. 添加到两个钩子
-(add-hook 'org-after-todo-state-change-hook 'my/org-auto-mark-next-on-done)
-(add-hook 'org-agenda-after-todo-state-change-hook 'my/org-auto-mark-next-on-done)
+          (tags-todo "IBX"
+                ((org-agenda-overriding-header "📥 Tasks to Refile")
+                 (org-tags-match-list-sublevels nil)))
+          
+          (tags-todo "MOVS"
+                ((org-agenda-overriding-header "📌 Standalone Tasks")
+                (org-agenda-todo-ignore-scheduled t)
+                (org-agenda-todo-ignore-deadlines nil)
+                (org-agenda-tags-todo-honor-ignore-options t)
+                ;(org-agenda-skip-function 'my/moves-skipper)  ; 跳过排期的日程
+                 (org-tags-match-list-sublevels nil)))
+        
+          (tags-todo "-CANCELLED/!NEXT"
+                      ((org-agenda-overriding-header "🎯 Next Actions")
+                        (org-agenda-todo-ignore-scheduled t)
+                        (org-agenda-todo-ignore-deadlines nil)
+                        (org-agenda-tags-todo-honor-ignore-options t)
+                        (org-tags-match-list-sublevels t)
+                        (org-agenda-sorting-strategy '(todo-state-down effort-up category-keep))))
+          
+          (tags-todo "-CANCELLED/!"
+                     ((org-agenda-overriding-header "⚠️ Stuck Projects (No NEXT Task)")
+                      (org-agenda-skip-function 'bh/skip-non-stuck-projects)
+                      (org-agenda-sorting-strategy '(category-keep))))
+          
+          (tags-todo "-HOLD-CANCELLED/!"
+                     ((org-agenda-overriding-header "📁 Active Projects")
+                      (org-agenda-skip-function 'bh/skip-non-projects)
+                      (org-tags-match-list-sublevels 'indented)
+                      (org-agenda-sorting-strategy '(category-keep))))
+          
+          (tags-todo "-CANCELLED+WAITING|HOLD/!"
+                     ((org-agenda-overriding-header "⏸ Waiting and Postponed Tasks")
+                      (org-agenda-skip-function 'bh/skip-non-tasks)
+                      (org-tags-match-list-sublevels nil)
+                      (org-agenda-sorting-strategy '(category-keep))))
+          
+          (tags "-REFILE/"
+                ((org-agenda-overriding-header "📦 Tasks to Archive")
+                 (org-agenda-skip-function 'bh/skip-non-archivable-tasks)
+                 (org-tags-match-list-sublevels nil)))))))
 
+;; ===========================================================
+;; 项目定义与检测函数（基于 Bernt Hansen 的方法）
+;; ===========================================================
+
+(defun bh/is-project-p ()
+  "任何包含 TODO 关键字子任务的任务都是项目"
+  (save-restriction
+    (widen)
+    (let ((has-subtask)
+          (subtree-end (save-excursion (org-end-of-subtree t)))
+          (is-a-task (member (nth 2 (org-heading-components)) org-todo-keywords-1)))
+      (save-excursion
+        (forward-line 1)
+        (while (and (not has-subtask)
+                    (< (point) subtree-end)
+                    (re-search-forward "^\*+ " subtree-end t))
+          (when (member (org-get-todo-state) org-todo-keywords-1)
+            (setq has-subtask t))))
+      (and is-a-task has-subtask))))
+
+(defun bh/is-project-subtree-p ()
+  "判断当前任务是否属于某个项目的子任务"
+  (let ((task (save-excursion (org-back-to-heading 'invisible-ok) (point))))
+    (save-excursion
+      (bh/find-project-task)
+      (not (equal (point) task)))))
+
+(defun bh/find-project-task ()
+  "向上查找父级项目任务"
+  (save-restriction
+    (widen)
+    (let ((parent-task (save-excursion (org-back-to-heading 'invisible-ok) (point))))
+      (while (org-up-heading-safe)
+        (when (member (nth 2 (org-heading-components)) org-todo-keywords-1)
+          (setq parent-task (point))))
+      (goto-char parent-task)
+      parent-task)))
+
+(defun bh/is-task-p ()
+  "任何有 TODO 关键字但没有子任务的任务"
+  (save-restriction
+    (widen)
+    (let ((has-subtask)
+          (subtree-end (save-excursion (org-end-of-subtree t)))
+          (is-a-task (member (nth 2 (org-heading-components)) org-todo-keywords-1)))
+      (save-excursion
+        (forward-line 1)
+        (while (and (not has-subtask)
+                    (< (point) subtree-end)
+                    (re-search-forward "^\*+ " subtree-end t))
+          (when (member (org-get-todo-state) org-todo-keywords-1)
+            (setq has-subtask t))))
+      (and is-a-task (not has-subtask)))))
+
+
+;; ===========================================================
+;; 卡住项目检测（Stuck Projects）
+;; ===========================================================
+
+(defun bh/skip-non-stuck-projects ()
+  "跳过不是卡住的项目（即有 NEXT 子任务的项目）"
+  (save-restriction
+    (widen)
+    (let ((next-headline (save-excursion (or (outline-next-heading) (point-max)))))
+      (if (bh/is-project-p)
+          (let* ((subtree-end (save-excursion (org-end-of-subtree t)))
+                 (has-next))
+            (save-excursion
+              (forward-line 1)
+              (while (and (not has-next) (< (point) subtree-end) 
+                          (re-search-forward "^\\*+ NEXT " subtree-end t))
+                (unless (member "WAITING" (org-get-tags-at))
+                  (setq has-next t))))
+            (if has-next
+                next-headline  ; 有 NEXT 任务，跳过
+              nil))            ; 没有 NEXT 任务，显示（卡住的项目）
+        next-headline))))
+
+(defun bh/skip-non-projects ()
+  "跳过不是项目的任务，只显示项目级别的任务"
+  (save-restriction
+    (widen)
+    (let ((subtree-end (save-excursion (org-end-of-subtree t))))
+      (cond
+       ((bh/is-project-p)
+        nil)  ; 是项目，显示
+       ((and (bh/is-project-subtree-p) (not (bh/is-task-p)))
+        nil)  ; 是项目子任务但不是叶子任务，也显示
+       (t
+        subtree-end)))))  ; 其他情况跳过
+
+;; ===========================================================
+;; 自动维护 NEXT 状态（确保 NEXT 只出现在叶子任务）
+;; ===========================================================
+
+(defun bh/mark-next-parent-tasks-todo ()
+  "将父级 NEXT 任务自动改回 TODO"
+  (let ((mystate (or (and (fboundp 'org-state) state)
+                     (nth 2 (org-heading-components)))))
+    (when mystate
+      (save-excursion
+        (while (org-up-heading-safe)
+          (when (member (nth 2 (org-heading-components)) (list "NEXT"))
+            (org-todo "TODO")))))))
+
+;; 添加到两个钩子中（不影响现有钩子）
+(add-hook 'org-after-todo-state-change-hook 'bh/mark-next-parent-tasks-todo 'append)
+(add-hook 'org-agenda-after-todo-state-change-hook 'my/bh/mark-next-parent-tasks-todo 'append)
+;(add-hook 'org-clock-in-hook 'bh/mark-next-parent-tasks-todo 'append)
+
+; ===========================================================
+; config org-download
+; ===========================================================
 (use-package org-download
     :hook (org-mode . (lambda () (require 'org-download)))  ; 进入 org-mode 时加载 org-download
     :custom
@@ -322,7 +362,9 @@
   (cond (*sys/win32* (my/org-download-clipboard-windows))
         (*sys/wsl* (my/org-download-clipboard-WSL))
         (t (org-download-clipboard)))) ; for Linux system
-
+; ===========================================================
+; End of configuration of org-download
+; ===========================================================
 
 (setq org-log-done 'time)
 
