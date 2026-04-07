@@ -36,10 +36,11 @@
 ;;; Code:
 
 (when *sys/mac*
-  (setq fonts '("SF Mono" "冬青黑体简体中文"))
-  (set-fontset-font t 'unicode "Apple Color Emoji" nil 'prepend)
+  (setq fonts '("Menlo" "Songti SC"))
+  (set-fontset-font t 'unicode "Menlo" nil 'prepend)
+  (set-fontset-font t 'han "Songti SC" nil 'prepend)
   (set-face-attribute 'default nil :font
-                      (format "%s:pixelsize=%d" (car fonts) 16)))
+                      (format "%s:pixelsize=%d" (car fonts) 13)))
 
 (when *sys/win32*
   (setq fonts '("Consolas" "微软雅黑"))
@@ -48,9 +49,9 @@
                       (format "%s:pixelsize=%d" (car fonts) 16)))
 
 (when (or *sys/wsl* *sys/linux*)
-  (setq fonts '("Ubuntu Sans Mono" "Noto Serif CJK SC"))
+  (setq fonts '("Ubuntu Sans Mono" "SINO-STFangSong"))
   (set-fontset-font t 'unicode "Ubuntu Sans Mono" nil 'prepend)
-  (set-fontset-font t 'han "Noto Serif CJK SC" nil 'prepend)
+  (set-fontset-font t 'han "SINO-STFangSong" nil 'prepend)
   (set-face-attribute 'default nil 
                       :family (car fonts) 
                       :weight 'bold
