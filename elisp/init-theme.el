@@ -42,7 +42,7 @@
 ;; DoomThemes
 (use-package doom-themes
   :custom-face
-  (cursor ((t (:background "Red"))))
+  (cursor ((t (:background "#479ffe"))))
   :config
   ;; flashing mode-line on errors
   (doom-themes-visual-bell-config)
