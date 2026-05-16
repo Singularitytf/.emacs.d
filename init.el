@@ -99,7 +99,14 @@ If you experience freezing, decrease this.  If you experience stuttering, increa
 
 (update-to-load-path (expand-file-name "elisp" user-emacs-directory))
 ;; -LoadPath
-
+(with-eval-after-load 'org
+  (defun org--get-display-dpi ()
+    "Fixed version to handle display without physical size info."
+    (or (and (display-graphic-p)
+             (> (display-mm-width) 0)
+             (> (display-mm-height) 0)
+             (/ (display-pixel-width) (/ (display-mm-width) 25.4)))
+        140.0)))  ;; 默认 140 DPI
 ;; Constants
 
 (require 'init-const)

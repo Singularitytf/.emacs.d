@@ -85,6 +85,7 @@
 
 
 (setq org-startup-indented t)
+(setq org-preview-latex-default-process 'dvisvgm)
 
 ;(setq org-agenda-span 'day)
 
@@ -517,6 +518,8 @@
   ;; 属性标签使用上述定义的符号，不由 org-modern 定义
   (setq org-modern-block-name nil)
   (setq org-modern-keyword nil)
+
+  (setq org-modern-progress nil)
 )
 
 
