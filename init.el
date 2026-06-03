@@ -105,7 +105,7 @@ If you experience freezing, decrease this.  If you experience stuttering, increa
     (or (and (display-graphic-p)
              (> (display-mm-width) 0)
              (> (display-mm-height) 0)
-             (/ (display-pixel-width) (/ (display-mm-width) 25.4)))
+             (/ (display-pixel-width) (/ (display-mm-width) 6))) ; 原来这里写 25.4
         140.0)))  ;; 默认 140 DPI
 ;; Constants
 
@@ -220,55 +220,51 @@ If you experience freezing, decrease this.  If you experience stuttering, increa
 (require 'init-chinese-font)
 
 ;; WSL2 下与 Windows 剪贴板互通
+;; === 全局编码基础（保留你原有的，确保在最前面） ===
+(set-default-coding-systems 'utf-8)
+(set-terminal-coding-system 'utf-8)
+(set-keyboard-coding-system 'utf-8)
+(set-selection-coding-system 'utf-8) ;; ← 新增：防止原生剪贴板回退时乱码
+(prefer-coding-system 'utf-8)
+
+;; === WSL2 剪贴板互通（优化版） ===
 (when *sys/wsl*
-  ;; 复制到 Windows 剪贴板
-  (defun wsl-copy-to-clipboard ()
-    "Copy region to Windows clipboard using native WSL tool."
-    (interactive)
-    (if (region-active-p)
-        (let ((text (buffer-substring-no-properties (region-beginning) (region-end))))
-          (with-temp-buffer
-            (insert text)
-            ;; wl-clipboard 或 xclip 效率很高 (需要额外安装)
-            (call-process-region (point-min) (point-max)
-                                "wl-copy" nil 0 nil)))
-      (message "No region selected")))
+  ;; 检测 wl-clipboard
+  (defvar wsl--have-wl-copy (executable-find "wl-copy")
+    "Whether wl-copy is available.")
 
-;; 从 Windows 剪贴板粘贴
-(defun wsl-paste-from-clipboard ()
-  "Paste from Windows clipboard via PowerShell with UTF-8 and ^M cleanup."
-  (interactive)
-  (let ((text
-         ;; 关键：设置控制台输出编码为 UTF-8
-         (with-temp-buffer
-           (let ((process-environment process-environment))
-             ;; 确保 PowerShell 使用 UTF-8
-             (setenv "PYTHONIOENCODING" "utf-8") ; 无关但无害
-             (call-process "powershell.exe" nil t nil
-                           "-Command"
-                           "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-Clipboard")
-             (decode-coding-string (buffer-string) 'utf-8-unix)))))
-    ;; 清理 ^M 和尾部空白
-    (setq text (replace-regexp-in-string "\r" "" text))
-    (setq text (string-trim-right text))
-    (unless (string-empty-p text)
-      (insert text))))
+  (when wsl--have-wl-copy
+    ;; 复制
+    (defun wsl-copy-to-clipboard (beg end &rest _)
+      (when (> end beg)
+        (let ((text (buffer-substring-no-properties beg end)))
+          (start-process "wsl-wl-copy" nil "wl-copy" "--" text))))
 
-;; 可选：让 Emacs 默认的 kill-ring 与 Windows 剪贴板同步
-(defun wsl-kill-ring-save-and-sync (orig-fun &rest args)
-  "Save to kill-ring and sync to Windows clipboard."
-  (apply orig-fun args)
-  (when (region-active-p)
-    (wsl-copy-to-clipboard)))
-  
-  (advice-add 'kill-ring-save :around #'wsl-kill-ring-save-and-sync) 
-)
+    (advice-add 'kill-ring-save :before #'wsl-copy-to-clipboard)
+    (advice-add 'kill-region :before #'wsl-copy-to-clipboard)
 
-(set-default-coding-systems 'utf-8) ; 默认编码
-(set-terminal-coding-system 'utf-8) ; 终端编码
-(set-keyboard-coding-system 'utf-8) ; 键盘编码
-(prefer-coding-system 'utf-8) ; 首选编码
+    ;; 粘贴
+    (defun wsl-paste-from-clipboard ()
+      (interactive)
+      (let ((text (with-temp-buffer
+                    (let ((process-environment process-environment))
+                      (setenv "PYTHONIOENCODING" "utf-8")
+                      (call-process (or (executable-find "pwsh") "powershell.exe")
+                                    nil t nil
+                                    "-NoProfile" "-Command"
+                                    "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-Clipboard")
+                      (decode-coding-string (buffer-string) 'utf-8-unix)))))
+        (setq text (string-trim-right (replace-regexp-in-string "\r" "" text)))
+        (unless (string-empty-p text)
+          (kill-new text)
+          (insert text))))
 
+    (global-set-key (kbd "C-y") #'wsl-paste-from-clipboard)
+    (global-set-key (kbd "C-v") #'wsl-paste-from-clipboard))
+
+  ;; 可选：fallback 提示
+  (unless wsl--have-wl-copy
+    (warn "wl-copy not found. Run: sudo apt install wl-clipboard")))
 
 
 ;; InitPrivate

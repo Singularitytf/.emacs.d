@@ -390,16 +390,16 @@
   ;; 不对上下标（如 x_1, y^2）进行美化隐藏，保留原始文本形式，便于编辑
 
   ;; LaTeX 公式预览图像缩放设置（用于 C-c C-x C-l 触发的 LaTeX 预览）
-  (my/latex-preview-scale 1.8)
+  ;(my/latex-preview-scale 1.8)
   ;; 自定义变量：LaTeX 预览图片的缩放比例（1.8 倍更清晰）
 
   (org-format-latex-options
    `(:foreground "default"
      :background "default"
-     :scale ,my/latex-preview-scale
+;     :scale ,my/latex-preview-scale
      :html-foreground "Black"
      :html-background "Transparent"
-     :html-scale ,my/latex-preview-scale
+;     :html-scale ,my/latex-preview-scale
      :matchers ("begin" "$1" "$" "$$" "\\(" "\\[")))
   ;; 设置 LaTeX 公式转图片时的样式参数：
   ;; - 使用默认前景/背景色（避免与主题冲突）
@@ -566,56 +566,8 @@
   :straight nil          
   :defer t
   :hook (org-mode . org-preview-mode))
-;(use-package org
-;  :straight (:type built-in)
-;  :defer t
-;  :bind (("C-c l" . org-store-link)
-;         ("C-c a" . org-agenda)
-;         ("C-c c" . org-capture)
-;         (:map org-mode-map (("C-c C-p" . eaf-org-export-to-pdf-and-open)
-;                             ("C-c ;" . nil))))
-;  :custom
-;  (org-log-done 'time)
-;  (calendar-latitude 30.659722) ;; Prerequisite: set it to your location, currently default: Toronto, Canada
-;  (calendar-longitude 104.063333) ;; Usable for M-x `sunrise-sunset' or in `org-agenda'
-;  (org-export-backends (quote (ascii html icalendar latex md odt)))
-;  (org-use-speed-commands t)
-;  (org-confirm-babel-evaluate 'nil)
-;  (org-latex-listings-options '(("breaklines" "true")))
-;  (org-latex-listings t)
-;  (org-deadline-warning-days 7)
-;  (org-todo-keywords
-;   '((sequence "TODO" "IN-PROGRESS" "REVIEW" "|" "DONE" "CANCELED")))
-;  (org-agenda-window-setup 'other-window)
-;  (org-latex-pdf-process
-;   '("pdflatex -shelnl-escape -interaction nonstopmode -output-directory %o %f"
-;     "pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"))
-;  :custom-face
-;  (org-agenda-current-time ((t (:foreground "spring green"))))
-;  :config
-;  (add-to-list 'org-latex-packages-alist '("" "listings"))
-;  (unless (version< org-version "9.2")
-;    (require 'org-tempo))
-;  (when (file-directory-p "~/org/agenda/")
-;    (setq org-agenda-files (list "~/org/agenda/")))
-;  (org-babel-do-load-languages
-;   'org-babel-load-languages
-;   '(;; other Babel languages
-;     (C . t)
-;     (python . t)
-;     (plantuml . t)))
-;  (defun org-export-toggle-syntax-highlight ()
-;    "Setup variables to turn on syntax highlighting when calling `org-latex-export-to-pdf'."
-;    (interactive)
-;    (setq-local org-latex-listings 'minted)
-;    (add-to-list 'org-latex-packages-alist '("newfloat" "minted")))
-;
-;  (defun org-table-insert-vertical-hline ()
-;    "Insert a #+attr_latex to the current buffer, default the align to |c|c|c|, adjust if necessary."
-;    (interactive)
-;    (insert "#+attr_latex: :align |c|c|c|")))
-;; -OrgPac
 
+;; OrgRoamPac
 (use-package org-roam
   :ensure t ;; 自动安装
   :custom
@@ -634,6 +586,7 @@
   :config
   (require 'org-roam-dailies)  ;; 启用日记功能
   (org-roam-db-autosync-mode)) ;; 启动时自动同步数据库
+;;; -OrgRoamPac
 
 (use-package org-roam-ui
   :ensure t ;; 自动安装
@@ -643,24 +596,7 @@
   (org-roam-ui-follow t) ;; 笔记节点跟随
   (org-roam-ui-update-on-save t))
 
-;; OrgRoamPac
-;(use-package org-roam
-;  :after org
-;  :custom
-;  (org-roam-node-display-template
-;   (concat "${title:*} "
-;           (propertize "${tags:10}" 'face 'org-tag)))
-;  (org-roam-completion-everywhere t)
-;  :bind
-;  (("C-c n l" . org-roam-buffer-toggle)
-;   ("C-c n f" . org-roam-node-find)
-;   ("C-c n i" . org-roam-node-insert)
-;   ("C-c n h" . org-id-get-create))
-;  :config
-;  (when (file-directory-p "~/Documents/roam")
-;    (setq org-roam-directory (file-truename "~/Documents/roam")))
-;  (org-roam-db-autosync-mode))
-;;; -OrgRoamPac
+
 
 ;; HTMLIZEPac
 (use-package htmlize :defer t)
