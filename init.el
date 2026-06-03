@@ -227,44 +227,52 @@ If you experience freezing, decrease this.  If you experience stuttering, increa
 (set-selection-coding-system 'utf-8) ;; ← 新增：防止原生剪贴板回退时乱码
 (prefer-coding-system 'utf-8)
 
-;; === WSL2 剪贴板互通（优化版） ===
+;; WSL2 下与 Windows 剪贴板互通
 (when *sys/wsl*
-  ;; 检测 wl-clipboard
-  (defvar wsl--have-wl-copy (executable-find "wl-copy")
-    "Whether wl-copy is available.")
+  ;; 复制到 Windows 剪贴板
+  (defun wsl-copy-to-clipboard ()
+    "Copy region to Windows clipboard using native WSL tool."
+    (interactive)
+    (if (region-active-p)
+        (let ((text (buffer-substring-no-properties (region-beginning) (region-end))))
+          (with-temp-buffer
+            (insert text)
+            ;; wl-clipboard 或 xclip 效率很高 (需要额外安装)
+            (call-process-region (point-min) (point-max)
+                                "wl-copy" nil 0 nil)))
+      (message "No region selected")))
 
-  (when wsl--have-wl-copy
-    ;; 复制
-    (defun wsl-copy-to-clipboard (beg end &rest _)
-      (when (> end beg)
-        (let ((text (buffer-substring-no-properties beg end)))
-          (start-process "wsl-wl-copy" nil "wl-copy" "--" text))))
+;; 从 Windows 剪贴板粘贴
+(defun wsl-paste-from-clipboard ()
+  "Paste from Windows clipboard via PowerShell with correct UTF-8 handling."
+  (interactive)
+  (let ((text
+         (with-temp-buffer
+           (call-process "powershell.exe" nil t nil
+                         "-Command"
+                         "Get-Clipboard -TextFormatType Unicode")
+           ;; 关键：PowerShell 输出的是 UTF-16 LE，需要正确解码
+           (decode-coding-string (buffer-string) 'utf-16-le))))
+    ;; 清理 \r 和尾部空白
+    (setq text (replace-regexp-in-string "\r$" "" text))
+    (setq text (string-trim-right text))
+    (unless (string-empty-p text)
+      (insert text))))
 
-    (advice-add 'kill-ring-save :before #'wsl-copy-to-clipboard)
-    (advice-add 'kill-region :before #'wsl-copy-to-clipboard)
+;; 可选：让 Emacs 默认的 kill-ring 与 Windows 剪贴板同步
+(defun wsl-kill-ring-save-and-sync (orig-fun &rest args)
+  "Save to kill-ring and sync to Windows clipboard."
+  (apply orig-fun args)
+  (when (region-active-p)
+    (wsl-copy-to-clipboard)))
+  
+  (advice-add 'kill-ring-save :around #'wsl-kill-ring-save-and-sync) 
+)
 
-    ;; 粘贴
-    (defun wsl-paste-from-clipboard ()
-      (interactive)
-      (let ((text (with-temp-buffer
-                    (let ((process-environment process-environment))
-                      (setenv "PYTHONIOENCODING" "utf-8")
-                      (call-process (or (executable-find "pwsh") "powershell.exe")
-                                    nil t nil
-                                    "-NoProfile" "-Command"
-                                    "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-Clipboard")
-                      (decode-coding-string (buffer-string) 'utf-8-unix)))))
-        (setq text (string-trim-right (replace-regexp-in-string "\r" "" text)))
-        (unless (string-empty-p text)
-          (kill-new text)
-          (insert text))))
-
-    (global-set-key (kbd "C-y") #'wsl-paste-from-clipboard)
-    (global-set-key (kbd "C-v") #'wsl-paste-from-clipboard))
-
-  ;; 可选：fallback 提示
-  (unless wsl--have-wl-copy
-    (warn "wl-copy not found. Run: sudo apt install wl-clipboard")))
+(set-default-coding-systems 'utf-8) ; 默认编码
+(set-terminal-coding-system 'utf-8) ; 终端编码
+(set-keyboard-coding-system 'utf-8) ; 键盘编码
+(prefer-coding-system 'utf-8) ; 首选编码
 
 
 ;; InitPrivate
