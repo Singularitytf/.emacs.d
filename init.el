@@ -224,12 +224,11 @@ If you experience freezing, decrease this.  If you experience stuttering, increa
 (set-default-coding-systems 'utf-8)
 (set-terminal-coding-system 'utf-8)
 (set-keyboard-coding-system 'utf-8)
-(set-selection-coding-system 'utf-8) ;; ← 新增：防止原生剪贴板回退时乱码
 (prefer-coding-system 'utf-8)
 
 ;; WSL2 下与 Windows 剪贴板互通
 (when *sys/wsl*
-  ;; 复制到 Windows 剪贴板
+  ;; 复制到 Windows 剪贴板（保持不变）
   (defun wsl-copy-to-clipboard ()
     "Copy region to Windows clipboard using native WSL tool."
     (interactive)
@@ -237,42 +236,30 @@ If you experience freezing, decrease this.  If you experience stuttering, increa
         (let ((text (buffer-substring-no-properties (region-beginning) (region-end))))
           (with-temp-buffer
             (insert text)
-            ;; wl-clipboard 或 xclip 效率很高 (需要额外安装)
             (call-process-region (point-min) (point-max)
                                 "wl-copy" nil 0 nil)))
       (message "No region selected")))
 
-;; 从 Windows 剪贴板粘贴
-(defun wsl-paste-from-clipboard ()
-  "Paste from Windows clipboard via PowerShell with correct UTF-8 handling."
-  (interactive)
-  (let ((text
-         (with-temp-buffer
-           (call-process "powershell.exe" nil t nil
-                         "-Command"
-                         "Get-Clipboard -TextFormatType Unicode")
-           ;; 关键：PowerShell 输出的是 UTF-16 LE，需要正确解码
-           (decode-coding-string (buffer-string) 'utf-16-le))))
-    ;; 清理 \r 和尾部空白
-    (setq text (replace-regexp-in-string "\r$" "" text))
-    (setq text (string-trim-right text))
-    (unless (string-empty-p text)
-      (insert text))))
+  (defun wsl-paste-from-clipboard ()
+    "Paste from Windows clipboard using wl-paste."
+    (interactive)
+    (let ((text (shell-command-to-string "wl-paste")))
+      (setq text (replace-regexp-in-string "\r\n" "\n" text))
+      (setq text (string-trim-right text))  ;; 删除末尾多余换行
+      (insert text)))
+  
+  
 
-;; 可选：让 Emacs 默认的 kill-ring 与 Windows 剪贴板同步
-(defun wsl-kill-ring-save-and-sync (orig-fun &rest args)
-  "Save to kill-ring and sync to Windows clipboard."
-  (apply orig-fun args)
-  (when (region-active-p)
-    (wsl-copy-to-clipboard)))
+  ;; 让 Emacs 默认的 kill-ring 与 Windows 剪贴板同步
+  (defun wsl-kill-ring-save-and-sync (orig-fun &rest args)
+    "Save to kill-ring and sync to Windows clipboard."
+    (apply orig-fun args)
+    (when (region-active-p)
+      (wsl-copy-to-clipboard)))
   
   (advice-add 'kill-ring-save :around #'wsl-kill-ring-save-and-sync) 
+  (global-set-key (kbd "C-y") #'wsl-paste-from-clipboard)
 )
-
-(set-default-coding-systems 'utf-8) ; 默认编码
-(set-terminal-coding-system 'utf-8) ; 终端编码
-(set-keyboard-coding-system 'utf-8) ; 键盘编码
-(prefer-coding-system 'utf-8) ; 首选编码
 
 
 ;; InitPrivate
